@@ -21,7 +21,7 @@ p { margin: 0; }
 .top strong { flex: 1; color: var(--accent); }
 main { padding: 1rem; }
 .tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 2; }
-.tabs a { flex: 1; text-align: center; padding: .85rem .25rem; color: var(--muted); text-decoration: none; font-size: .9rem; }
+.tabs a { flex: 1; text-align: center; padding: .85rem .15rem; color: var(--muted); text-decoration: none; font-size: .8rem; }
 .tabs a.active { color: var(--accent); font-weight: 600; }
 .stack { display: flex; flex-direction: column; gap: .75rem; }
 .stack.tight { gap: .35rem; }

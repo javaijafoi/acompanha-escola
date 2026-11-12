@@ -8,8 +8,10 @@ import type { Book, Chapter, Checkin, CheckinItem, Photo, Review, Subject, Task 
 import ReviewCard, { TodoList } from '../components/ReviewCard'
 import Photos from '../components/Photos'
 
-export default function Hoje() {
+// readOnly: visão do responsável, que vê exatamente o que o aluno vê, sem poder mexer.
+export default function Hoje({ readOnly = false }: { readOnly?: boolean }) {
   const { profile } = useSession()
+  const [childId, setChildId] = useState<string | null>(readOnly ? null : profile!.id)
   const [checkin, setCheckin] = useState<Checkin | null>(null)
   const [items, setItems] = useState<CheckinItem[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -24,7 +26,13 @@ export default function Hoje() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!readOnly) return
+    supabase.from('profiles').select('id').eq('role', 'child').limit(1).maybeSingle().then(({ data }) => setChildId(data?.id ?? ''))
+  }, [readOnly])
+
   async function reload() {
+    if (!childId) return
     const [s, c, g, { data: bk }, { data: tk }] = await Promise.all([
       loadSubjects(), loadChapters(), loadActiveTimetable(),
       supabase.from('books').select('*').eq('status', 'cadastrado').order('created_at'),
@@ -32,7 +40,7 @@ export default function Hoje() {
     ])
     setSubjects(s); setChapters(c); setGrade(g); setBooks((bk ?? []) as Book[]); setTasks((tk ?? []) as Task[])
     await loadToFix()
-    const { data: ck } = await supabase.from('checkins').select('*').eq('child_id', profile!.id).eq('day', today()).maybeSingle()
+    const { data: ck } = await supabase.from('checkins').select('*').eq('child_id', childId).eq('day', today()).maybeSingle()
     setCheckin(ck as Checkin | null)
     if (!ck) { setItems([]); setPhotos([]); setReviews([]); return }
     const { data: its } = await supabase.from('checkin_items').select('*').eq('checkin_id', ck.id).order('created_at')
@@ -43,12 +51,12 @@ export default function Hoje() {
     ])
     setItems((its ?? []) as CheckinItem[]); setPhotos((ph ?? []) as Photo[]); setReviews((rv ?? []) as Review[])
   }
-  useEffect(() => { reload() }, [])
+  useEffect(() => { reload() }, [childId])
 
   // Matérias devolvidas (de qualquer dia) que ele ainda precisa completar e reenviar
   async function loadToFix() {
     const { data: its } = await supabase.from('checkin_items').select('*, checkins!inner(day, child_id)')
-      .eq('review_status', 'devolvido').eq('checkins.child_id', profile!.id)
+      .eq('review_status', 'devolvido').eq('checkins.child_id', childId)
     const list = (its ?? []) as (CheckinItem & { checkins: { day: string } })[]
     const ids = list.map((i) => i.id)
     if (!ids.length) { setToFix([]); return }
@@ -72,7 +80,7 @@ export default function Hoje() {
 
   const subjectName = (id: string) => subjects.find((s) => s.id === id)?.name ?? '?'
   const chapterName = (id: string | null) => chapters.find((c) => c.id === id)?.title
-  const editable = !checkin || checkin.status === 'rascunho'
+  const editable = !readOnly && (!checkin || checkin.status === 'rascunho')
   const weekday = new Date(today() + 'T12:00:00Z').getUTCDay()
   const expected = grade[weekday] ?? []
   const isRequired = (sid: string) => subjects.find((s) => s.id === sid)?.required ?? false
@@ -138,12 +146,13 @@ export default function Hoje() {
 
   return (
     <div className="stack">
-      <h2>Diário de hoje <span className="muted small">{fmtDay(today())}</span></h2>
+      <h2>{readOnly ? 'O que o aluno vê hoje' : 'Diário de hoje'} <span className="muted small">{fmtDay(today())}</span></h2>
+      {readOnly && childId === '' && <p className="banner">Nenhuma conta de aluno nesta família ainda.</p>}
       <StatusBanner checkin={checkin} devolvidos={devolvidos} />
 
       {toFix.map((f) => (
         <Completar key={f.item.id} entry={f} subjectName={subjectName(f.item.subject_id)} chapterName={chapterName(f.item.chapter_id)}
-          familyId={profile!.family_id} onDone={reload} />
+          familyId={profile!.family_id} onDone={reload} readOnly={readOnly} />
       ))}
 
       {tasks.length > 0 && (
@@ -238,9 +247,9 @@ function StatusBanner({ checkin, devolvidos }: { checkin: Checkin | null; devolv
 }
 
 // Uma matéria devolvida: mostra exatamente o que falta e deixa mandar só essas fotos (nova versão)
-function Completar({ entry, subjectName, chapterName, familyId, onDone }: {
+function Completar({ entry, subjectName, chapterName, familyId, onDone, readOnly }: {
   entry: { item: CheckinItem; day: string; review: Review | null; photos: Photo[] }
-  subjectName: string; chapterName?: string; familyId: string; onDone: () => void
+  subjectName: string; chapterName?: string; familyId: string; onDone: () => void; readOnly?: boolean
 }) {
   const { item, day, review, photos } = entry
   const [files, setFiles] = useState<File[]>([])
@@ -280,6 +289,7 @@ function Completar({ entry, subjectName, chapterName, familyId, onDone }: {
         <summary className="small">Fotos que você já mandou ({photos.length})</summary>
         <Photos photos={photos} />
       </details>
+      {readOnly ? <p className="small muted">Esperando ele reenviar (versão {item.version + 1}).</p> : <>
       <label className="button">📷 Fotos do que foi pedido ({files.length})
         <input hidden type="file" accept="image/*" capture="environment" multiple onChange={(e) => setFiles([...files, ...Array.from(e.target.files ?? [])])} />
       </label>
@@ -288,6 +298,7 @@ function Completar({ entry, subjectName, chapterName, familyId, onDone }: {
       <p className="small muted">Mande só as páginas pedidas (ou as que você refez). Eu junto com as que já estão aqui.</p>
       {err && <p className="note danger">{err}</p>}
       <button className="primary" disabled={busy} onClick={send}>{busy ? 'Enviando…' : `Reenviar (versão ${item.version + 1})`}</button>
+      </>}
     </div>
   )
 }
