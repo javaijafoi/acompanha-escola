@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSession } from '../lib/session'
-import { loadChapters, loadSubjects } from '../lib/data'
+import { copyText, loadChapters, loadSubjects } from '../lib/data'
+import { fmtDay } from '../lib/dates'
 import type { Chapter, Quiz, Subject } from '../lib/types'
 
 export default function Provinhas() {
@@ -22,8 +23,10 @@ export default function Provinhas() {
 
   const label = (q: Quiz) => {
     const ch = chapters.find((c) => c.id === q.chapter_id)
-    const sub = subjects.find((s) => s.id === ch?.subject_id)
-    return `${sub?.name ?? ''} · ${ch?.title ?? ''} · tentativa ${q.attempt}`
+    const sub = subjects.find((s) => s.id === (q.subject_id ?? ch?.subject_id))
+    if (q.kind === 'bloco') return `${sub?.name ?? ''} · revisão: ${q.title || ch?.title || ''}`
+    const n = quizzes.filter((x) => x.kind === 'capitulo' && x.chapter_id === q.chapter_id && x.attempt <= q.attempt).length
+    return `${sub?.name ?? ''} · ${ch?.title ?? ''} · provinha ${n}`
   }
   const child = profile?.role === 'child'
   const pending = quizzes.filter((q) => q.status === 'disponivel')
@@ -35,11 +38,11 @@ export default function Provinhas() {
   return (
     <div className="stack">
       <h2>Provinhas de revisão</h2>
-      <p className="muted small">Quando um capítulo termina, chega uma provinha. Abaixo de 7, vem outra, até passar.</p>
+      <p className="muted small">Quando um capítulo termina, chega uma provinha. Abaixo de 7, vem outra, até passar. Revisões 🔁 aparecem quando vale reforçar um assunto.</p>
       {pending.length === 0 && <p className="banner">Nenhuma provinha pendente agora.</p>}
       {pending.map((q) => (
         <button key={q.id} className="card left" onClick={() => setOpenId(q.id)}>
-          <strong>📝 {label(q)}</strong><br /><span className="small muted">{q.questions.length} questões · {child ? 'toque para fazer' : 'aguardando ela fazer'}</span>
+          <strong>{q.kind === 'bloco' ? '🔁' : '📝'} {label(q)}</strong><br /><span className="small muted">{q.questions.length} questões{q.due_on ? ` · até ${fmtDay(q.due_on)}` : ''} · {child ? 'toque para fazer' : 'aguardando ele fazer'}</span>
         </button>
       ))}
       {done.length > 0 && <h3>Feitas</h3>}
@@ -75,6 +78,7 @@ function QuizView({ quiz, title, canAnswer, onClose }: { quiz: Quiz; title: stri
     <div className="stack">
       <button className="link" onClick={onClose}>← voltar</button>
       <h2>{title}</h2>
+      {quiz.ai_prompt && <CopyPrompt text={quiz.ai_prompt} />}
       {quiz.status === 'corrigida' && <p className={'banner ' + ((quiz.score ?? 0) >= 7 ? 'ok' : 'warn')}>Nota {quiz.score?.toFixed(1)} {(quiz.score ?? 0) >= 7 ? '— capítulo dominado!' : '— vem outra provinha para treinar.'}</p>}
       {quiz.questions.map((q, i) => {
         const fb = quiz.feedback?.[q.id]
@@ -102,6 +106,16 @@ function QuizView({ quiz, title, canAnswer, onClose }: { quiz: Quiz; title: stri
       })}
       {err && <p className="note danger">{err}</p>}
       {canAnswer && <button className="primary big" disabled={busy} onClick={submit}>Entregar provinha</button>}
+    </div>
+  )
+}
+
+export function CopyPrompt({ text }: { text: string }) {
+  const [ok, setOk] = useState(false)
+  return (
+    <div className="note">
+      <b>Quer treinar mais?</b> Copie este pedido e cole no ChatGPT, Gemini ou outra IA. Ela monta outra revisão no mesmo estilo.
+      <div><button className="small" onClick={async () => { setOk(await copyText(text)); setTimeout(() => setOk(false), 2500) }}>{ok ? 'Copiado! ✓' : '📋 Copiar pedido'}</button></div>
     </div>
   )
 }

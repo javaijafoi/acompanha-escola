@@ -9,15 +9,20 @@ correção feita pelo Claude, folhinhas de revisão e provinhas de fim de capít
   em dias úteis à tarde e seguem [CORRECAO.md](CORRECAO.md). Também dá pra pedir uma rodada a qualquer hora.
 
 ## Fluxo
-1. A aluna cria o diário do dia: matéria, capítulo, o que aprendeu, folhas e fotos. Toca em **Entregar o dia**.
-2. A rodada de correção pega os dias `entregue`, lê as fotos, aceita ou devolve cada matéria, corrige e gera a folhinha.
-3. Matéria devolvida: ela faz os exercícios, toca em **Refazer as folhas devolvidas** e entrega de novo.
-4. Quando um capítulo termina (aba Matérias › Terminei), a próxima rodada gera a provinha. Nota < 7 gera outra.
-5. O pai vê no **Painel**: entregas, alerta se não entregou até as 17h, desempenho por matéria e observações.
+1. **Ajustes:** foto da grade horária (se mudar, precisa explicar o porquê), foto do sumário de cada livro e trimestres.
+   A rodada transcreve a grade e cadastra os capítulos com intervalo de páginas. Grade esquisita fica bloqueada para o responsável revisar.
+2. **Hoje:** o aluno lança cada matéria da grade com páginas de/até e uma foto por página (mesmo em branco), ou marca "não teve conteúdo" com o motivo.
+   Só consegue entregar com todas as matérias do dia e todas as fotos.
+3. A rodada ordena as páginas, confere páginas faltando (inclusive buracos entre dias), corrige, devolve o que veio em branco,
+   gera folhinha, revisões por bloco quando vale a pena e, quando o capítulo acaba (pelas páginas), a revisão obrigatória
+   e a provinha (refaz até tirar 7).
+4. Provinhas e capítulos têm **Copiar pedido** para treinar em outra IA. Só as provinhas do app contam.
+5. O responsável vê no **Painel**: alertas (só ele vê), entregas, desempenho por matéria por trimestre, pendências e o diário.
 
 ## Contas
 1. O responsável cria a conta sem código de família (vira `parent` de uma família nova).
-2. No painel aparece o **código da família**. A aluna cria a conta dela informando esse código (vira `child`).
+2. Em Ajustes aparece o **código da família**. O aluno cria a conta dele informando esse código (vira `child`).
+3. O perfil de aprendizagem (Ajustes, só o responsável vê) orienta o tom das correções.
 
 ## Desenvolvimento
 ```bash

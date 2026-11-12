@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useSession } from '../lib/session'
 import { loadSubjects } from '../lib/data'
 import { daysAgo, fmtDay } from '../lib/dates'
 import type { Checkin, CheckinItem, Photo, Review, Subject } from '../lib/types'
@@ -8,7 +7,6 @@ import ReviewCard from '../components/ReviewCard'
 import Photos from '../components/Photos'
 
 export default function Historico() {
-  const { profile } = useSession()
   const [checkins, setCheckins] = useState<Checkin[]>([])
   const [items, setItems] = useState<CheckinItem[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
@@ -54,7 +52,7 @@ export default function Historico() {
                   {i.learned && <p className="small">{i.learned}</p>}
                   {i.pages && <p className="small muted">Folhas: {i.pages}</p>}
                   <Photos photos={photos.filter((p) => p.item_id === i.id)} />
-                  {rv && <ReviewCard review={rv} forParent={profile?.role === 'parent'} />}
+                  {rv && <ReviewCard review={rv} />}
                 </div>
               )
             })}

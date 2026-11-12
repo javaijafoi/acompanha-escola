@@ -12,6 +12,7 @@ export default function Photos({ photos, onDelete }: { photos: Photo[]; onDelete
       {photos.map((p) => (
         <div key={p.id} className="thumb">
           {urls[p.storage_path] ? <a href={urls[p.storage_path]} target="_blank" rel="noreferrer"><img src={urls[p.storage_path]} alt="folha" /></a> : <div className="ph" />}
+          {p.version > 1 && <span className="ver">v{p.version}</span>}
           {onDelete && <button className="x" onClick={() => onDelete(p)} aria-label="Apagar foto">×</button>}
         </div>
       ))}
