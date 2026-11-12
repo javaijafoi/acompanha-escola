@@ -45,7 +45,7 @@ export default function App() {
       </main>
       <nav className="tabs">
         <NavLink to="/" end>{child ? 'Hoje' : 'Painel'}</NavLink>
-        <NavLink to="/provinhas">Provinhas</NavLink>
+        <NavLink to="/provinhas">Provas</NavLink>
         <NavLink to="/historico">Histórico</NavLink>
         <NavLink to="/materias">Matérias</NavLink>
         <NavLink to="/configurar">Ajustes</NavLink>
