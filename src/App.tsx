@@ -34,6 +34,7 @@ export default function App() {
           ) : (
             <>
               <Route path="/" element={<Painel />} />
+              <Route path="/aluno" element={<Hoje readOnly />} />
               <Route path="/historico" element={<Historico />} />
               <Route path="/provinhas" element={<Provinhas />} />
             </>
@@ -45,6 +46,7 @@ export default function App() {
       </main>
       <nav className="tabs">
         <NavLink to="/" end>{child ? 'Hoje' : 'Painel'}</NavLink>
+        {!child && <NavLink to="/aluno">Aluno</NavLink>}
         <NavLink to="/provinhas">Provas</NavLink>
         <NavLink to="/historico">Histórico</NavLink>
         <NavLink to="/materias">Matérias</NavLink>
