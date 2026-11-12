@@ -67,6 +67,24 @@ nomes da grade ativa). Decida:
 Depois `select w_set_book($j${"book_id": "...", "status": "cadastrado", "review_note": "N capítulos em M matérias"}$j$::jsonb);`
 Se não der para ler: `"status": "com_problema"`, um alerta `kind: "livro"` e uma tarefa `kind: "livro"`.
 
+## 1b. Provas da escola (`provas_para_ler`)
+
+São opcionais (1 ou 2 por trimestre). `select w_pending_exams();` lista as provas; as fotos vêm da edge function com
+`tipo: "prova"` e `exam_id`. Para cada prova:
+
+1. Leia todas as páginas: questões, o que ele respondeu e a correção/nota do professor.
+2. Para cada questão: `status` (certo | errado | parcial | em_branco) e um `comment` curto.
+3. `explanation` (markdown, para ele): questão por questão, só as que ele errou ou fez pela metade. Para cada uma:
+   **o que a questão pede**, **por que a resposta é aquela**, **os elementos que uma resposta completa precisa ter**
+   (em lista) e um **modelo curto de resposta completa**. Frases curtas, uma analogia de anime no máximo por questão.
+4. `revision_sheet` no estilo dele, focada nos erros, e `ai_prompt` (seção 5).
+5. Se a prova é de um capítulo que existe, mande `chapter_id`. Erros que se repetem viram alerta `dificuldade` para o pai.
+```sql
+select w_save_exam($j${"exam_id": "...", "status": "corrigida", "grade_text": "7,5 de 10", "summary": "...",
+  "questions": [{"ref": "Q1", "status": "parcial", "comment": "..."}], "explanation": "...", "revision_sheet": "...", "ai_prompt": "..."}$j$::jsonb);
+```
+Se não der para ler: `"status": "com_problema"` e uma tarefa `kind: "outro"` com `family_id` pedindo fotos melhores.
+
 ## 2. Corrigir os dias entregues (`dias_entregues`)
 
 `select w_claim_checkins();` marca os dias como "corrigindo" e devolve, por dia: os itens (matéria, capítulo e páginas

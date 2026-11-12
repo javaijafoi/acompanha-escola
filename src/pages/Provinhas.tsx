@@ -4,6 +4,7 @@ import { useSession } from '../lib/session'
 import { copyText, loadChapters, loadSubjects } from '../lib/data'
 import { fmtDay } from '../lib/dates'
 import type { Chapter, Quiz, Subject } from '../lib/types'
+import ProvasEscola from '../components/ProvasEscola'
 
 export default function Provinhas() {
   const { profile } = useSession()
@@ -56,6 +57,8 @@ export default function Provinhas() {
           </div>
         </button>
       ))}
+      <hr />
+      <ProvasEscola subjects={subjects} chapters={chapters} />
     </div>
   )
 }

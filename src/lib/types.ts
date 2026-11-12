@@ -57,3 +57,9 @@ export interface Quiz {
   score: number | null; feedback: Record<string, { correct: boolean; comment: string }> | null
   created_at: string; graded_at: string | null
 }
+export interface Exam {
+  id: string; subject_id: string | null; chapter_id: string | null; title: string; taken_on: string | null; note: string
+  status: 'aguardando_leitura' | 'corrigida' | 'com_problema'; grade_text: string; summary: string
+  questions: { ref: string; status: string; comment?: string }[]; explanation: string; revision_sheet: string; ai_prompt: string
+  created_at: string
+}
