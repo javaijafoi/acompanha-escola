@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase, BUCKET } from '../lib/supabase'
 import { useSession } from '../lib/session'
-import { loadActiveTimetable, loadChapters, loadSubjects, shrinkImage } from '../lib/data'
+import { loadActiveTimetable, loadChapters, loadSubjects, shrinkImage, uploadToBucket } from '../lib/data'
 import { fmtDay, today } from '../lib/dates'
 import { Link } from 'react-router-dom'
 import type { Book, Chapter, Checkin, CheckinItem, Photo, Review, Subject, Task } from '../lib/types'
-import ReviewCard from '../components/ReviewCard'
+import ReviewCard, { TodoList } from '../components/ReviewCard'
 import Photos from '../components/Photos'
 
 export default function Hoje() {
@@ -19,6 +19,7 @@ export default function Hoje() {
   const [books, setBooks] = useState<Book[]>([])
   const [grade, setGrade] = useState<Record<number, string[]>>({})
   const [tasks, setTasks] = useState<Task[]>([])
+  const [toFix, setToFix] = useState<{ item: CheckinItem; day: string; review: Review | null; photos: Photo[] }[]>([])
   const [adding, setAdding] = useState<string | boolean>(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -30,6 +31,7 @@ export default function Hoje() {
       supabase.from('tasks').select('*').eq('status', 'pendente').order('due_on'),
     ])
     setSubjects(s); setChapters(c); setGrade(g); setBooks((bk ?? []) as Book[]); setTasks((tk ?? []) as Task[])
+    await loadToFix()
     const { data: ck } = await supabase.from('checkins').select('*').eq('child_id', profile!.id).eq('day', today()).maybeSingle()
     setCheckin(ck as Checkin | null)
     if (!ck) { setItems([]); setPhotos([]); setReviews([]); return }
@@ -42,6 +44,24 @@ export default function Hoje() {
     setItems((its ?? []) as CheckinItem[]); setPhotos((ph ?? []) as Photo[]); setReviews((rv ?? []) as Review[])
   }
   useEffect(() => { reload() }, [])
+
+  // Matérias devolvidas (de qualquer dia) que ele ainda precisa completar e reenviar
+  async function loadToFix() {
+    const { data: its } = await supabase.from('checkin_items').select('*, checkins!inner(day, child_id)')
+      .eq('review_status', 'devolvido').eq('checkins.child_id', profile!.id)
+    const list = (its ?? []) as (CheckinItem & { checkins: { day: string } })[]
+    const ids = list.map((i) => i.id)
+    if (!ids.length) { setToFix([]); return }
+    const [{ data: rv }, { data: ph }] = await Promise.all([
+      supabase.from('reviews').select('*').in('item_id', ids),
+      supabase.from('photos').select('*').in('item_id', ids).order('version').order('sort', { nullsFirst: false }),
+    ])
+    setToFix(list.sort((a, b) => a.checkins.day.localeCompare(b.checkins.day)).map((i) => ({
+      item: i, day: i.checkins.day,
+      review: ((rv ?? []) as Review[]).find((r) => r.item_id === i.id) ?? null,
+      photos: ((ph ?? []) as Photo[]).filter((p) => p.item_id === i.id),
+    })))
+  }
 
   // Atualiza sozinho enquanto espera a correção
   useEffect(() => {
@@ -58,7 +78,7 @@ export default function Hoje() {
   const missingSubjects = expected.filter((sid) => !items.some((i) => i.subject_id === sid))
   const pageCount = (i: CheckinItem) => (i.page_from != null && i.page_to != null ? i.page_to - i.page_from + 1 : 1)
   const missingPhotos = items.filter((i) => !i.no_class_reason && photos.filter((p) => p.item_id === i.id).length < pageCount(i))
-  const devolvidos = items.filter((i) => i.review_status === 'devolvido')
+  const devolvidos = toFix.length
 
   async function ensureCheckin(): Promise<Checkin> {
     if (checkin) return checkin
@@ -115,19 +135,15 @@ export default function Hoje() {
     setBusy(false); reload()
   }
 
-  async function refazer() {
-    if (!checkin) return
-    setBusy(true)
-    const { error } = await supabase.from('checkins').update({ status: 'rascunho' }).eq('id', checkin.id)
-    if (!error) await supabase.from('checkin_items').update({ review_status: 'pendente' }).in('id', devolvidos.map((d) => d.id))
-    if (error) setErr(error.message)
-    setBusy(false); reload()
-  }
-
   return (
     <div className="stack">
       <h2>Diário de hoje <span className="muted small">{fmtDay(today())}</span></h2>
-      <StatusBanner checkin={checkin} devolvidos={devolvidos.length} />
+      <StatusBanner checkin={checkin} devolvidos={devolvidos} />
+
+      {toFix.map((f) => (
+        <Completar key={f.item.id} entry={f} subjectName={subjectName(f.item.subject_id)} chapterName={chapterName(f.item.chapter_id)}
+          familyId={profile!.family_id} onDone={reload} />
+      ))}
 
       {tasks.length > 0 && (
         <div className="card stack">
@@ -174,10 +190,9 @@ export default function Hoje() {
                 <button className="link danger" onClick={() => deleteItem(it)}>Tirar matéria</button>
               </div>
             )}
-            {rv && !editable && <ReviewCard review={rv} />}
-            {rv && editable && it.review_status === 'pendente' && rv.verdict === 'devolvido' && (
-              <p className="note">Devolvido antes: {rv.message_to_child} Mande as fotos novas com os exercícios feitos.</p>
-            )}
+            {it.review_status === 'devolvido' && <p className="note warn">Falta completar: veja o pedido lá em cima.</p>}
+            {it.review_status === 'pendente' && it.version > 1 && <p className="note">Versão {it.version} enviada. Esperando a correção.</p>}
+            {rv && it.review_status === 'aceito' && <ReviewCard review={rv} />}
           </div>
         )
       })}
@@ -205,9 +220,6 @@ export default function Hoje() {
       {editable && items.length > 0 && (
         <button className="primary big" disabled={busy} onClick={entregar}>Entregar o dia</button>
       )}
-      {checkin?.status === 'corrigido' && devolvidos.length > 0 && (
-        <button className="primary big" disabled={busy} onClick={refazer}>Refazer as folhas devolvidas</button>
-      )}
     </div>
   )
 }
@@ -219,9 +231,64 @@ function StatusBanner({ checkin, devolvidos }: { checkin: Checkin | null; devolv
     case 'entregue': return <p className="banner info">Entregue às {new Date(checkin.submitted_at!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. A correção sai em até 1 hora.</p>
     case 'corrigindo': return <p className="banner info">Corrigindo agora…</p>
     case 'corrigido': return devolvidos
-      ? <p className="banner warn">{devolvidos} matéria(s) voltaram: faça os exercícios e mande de novo.</p>
+      ? <p className="banner warn">Quase lá! Complete o que está pedido acima e reenvie.</p>
       : <p className="banner ok">Tudo corrigido! Veja as folhinhas de revisão abaixo.</p>
   }
+}
+
+// Uma matéria devolvida: mostra exatamente o que falta e deixa mandar só essas fotos (nova versão)
+function Completar({ entry, subjectName, chapterName, familyId, onDone }: {
+  entry: { item: CheckinItem; day: string; review: Review | null; photos: Photo[] }
+  subjectName: string; chapterName?: string; familyId: string; onDone: () => void
+}) {
+  const { item, day, review, photos } = entry
+  const [files, setFiles] = useState<File[]>([])
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function send() {
+    if (!files.length) return setErr('Tire as fotos do que foi pedido antes de reenviar.')
+    setBusy(true); setErr(null)
+    try {
+      const paths: string[] = []
+      for (const f of files) paths.push(await uploadToBucket(familyId, `${item.checkin_id}/${item.id}`, f))
+      const { error } = await supabase.rpc('resend_item', { p_item: item.id, p_paths: paths, p_note: note.trim() })
+      if (error) throw error
+      setFiles([]); setNote(''); onDone()
+    } catch (e: any) { setErr(e.message) }
+    setBusy(false)
+  }
+
+  return (
+    <div className="card stack review devolvido">
+      <div className="row between">
+        <strong>Completar: {subjectName}</strong>
+        <span className="small muted">{fmtDay(day)}{item.page_from != null ? ` · págs. ${item.page_from}–${item.page_to}` : ''}</span>
+      </div>
+      {chapterName && <span className="small muted">{chapterName}</span>}
+      {review?.message_to_child && <p>{review.message_to_child}</p>}
+      {review?.todo?.length ? <TodoList todo={review.todo} /> : <p className="small">Faça os exercícios que ficaram em branco e mande as fotos de novo.</p>}
+      {review && review.exercises.length > 0 && (
+        <details>
+          <summary className="small">Ver a correção da versão {review.version}</summary>
+          <ReviewCard review={review} />
+        </details>
+      )}
+      <details>
+        <summary className="small">Fotos que você já mandou ({photos.length})</summary>
+        <Photos photos={photos} />
+      </details>
+      <label className="button">📷 Fotos do que foi pedido ({files.length})
+        <input hidden type="file" accept="image/*" capture="environment" multiple onChange={(e) => setFiles([...files, ...Array.from(e.target.files ?? [])])} />
+      </label>
+      {files.length > 0 && <button className="link small" onClick={() => setFiles([])}>Limpar fotos escolhidas</button>}
+      <input placeholder="Recado (opcional), ex.: refiz a Q3" value={note} onChange={(e) => setNote(e.target.value)} />
+      <p className="small muted">Mande só as páginas pedidas (ou as que você refez). Eu junto com as que já estão aqui.</p>
+      {err && <p className="note danger">{err}</p>}
+      <button className="primary" disabled={busy} onClick={send}>{busy ? 'Enviando…' : `Reenviar (versão ${item.version + 1})`}</button>
+    </div>
+  )
 }
 
 interface ItemData {

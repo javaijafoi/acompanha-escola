@@ -10,10 +10,11 @@ export default function ReviewCard({ review }: { review: Review }) {
   return (
     <div className={'review ' + review.verdict}>
       <div className="row between">
-        <strong>{review.verdict === 'aceito' ? 'Aceito' : 'Devolvido: precisa fazer os exercícios'}</strong>
+        <strong>{review.verdict === 'aceito' ? 'Aceito' : 'Falta completar'}{review.version > 1 ? <span className="small muted"> · versão {review.version}</span> : null}</strong>
         <span className="small muted">feitos {pct(review.done_ratio)} · acertos {pct(review.correct_ratio)}</span>
       </div>
       {review.message_to_child && <p>{review.message_to_child}</p>}
+      {review.verdict === 'devolvido' && review.todo?.length > 0 && <TodoList todo={review.todo} />}
       {review.topics.length > 0 && (
         <div className="chips">{review.topics.map((t) => <span key={t} className="chip">{t}</span>)}</div>
       )}
@@ -34,5 +35,13 @@ export default function ReviewCard({ review }: { review: Review }) {
         </>
       )}
     </div>
+  )
+}
+
+export function TodoList({ todo }: { todo: string[] }) {
+  return (
+    <ol className="todo">
+      {todo.map((t, i) => <li key={i}>{t}</li>)}
+    </ol>
   )
 }

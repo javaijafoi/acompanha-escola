@@ -1,4 +1,4 @@
-# Roteiro da rodada de correção (v2)
+# Roteiro da rodada de correção (v3: versões de envio)
 
 Lido pelo Claude nas tarefas agendadas (dias úteis, 14h50, 15h50 e 16h50) e quando o Peter pede "corrigir agora".
 
@@ -33,6 +33,8 @@ select w_status();
 ```
 Se **todos os números forem 0**, termine aqui sem gravar nada ("Nada para corrigir.").
 Senão: `select w_open_run();` (guarde o id). Se `tarefas_vencidas > 0`: `select w_flag_overdue();`.
+Se `devolvidas_sem_reenvio > 0`: `select w_flag_unreturned();` (avisa o pai das matérias devolvidas ontem ou antes
+que o Pantoja não reenviou; a função já monta o alerta com o que faltava).
 
 ## 1. Grade horária e livros novos (`grades_para_ler`, `livros_para_ler`)
 
@@ -60,13 +62,26 @@ Se não der para ler: `"status": "com_problema"`, um alerta `kind: "livro"` e um
 do capítulo, páginas que ele disse que estudou, "sem_aula", o que aprendeu, quantas fotos, **histórico de páginas
 da matéria**) e as matérias da grade que ele não lançou (`faltando_na_grade`).
 
+**Devolver é falar com o Pantoja, não com o pai.** Na primeira vez que falta algo, o pedido vai só para ele, no app.
+O pai só é avisado se ele não reenviar até o fim do dia (o `w_flag_unreturned` da rodada seguinte faz isso) ou se
+a mesma coisa se repetir. Ele reenvia **só aquela matéria**, como uma nova versão.
+
+**Versões:** cada item tem `versao` (1 = primeiro envio). Se `versao > 1`, é um reenvio: `pedido_anterior` é o que você
+pediu, `fotos_por_versao` diz quantas fotos vieram em cada versão, e cada foto da edge function traz `versao`.
+Junte tudo: para cada página, vale a foto da **versão mais nova**; páginas que não vieram de novo continuam valendo
+as fotos antigas. Corrija o conjunto completo e confira se o `pedido_anterior` foi atendido.
+
 Para cada item com fotos:
 
 1. **Identifique a página de cada foto** (número impresso, conteúdo) e a **ordem certa**. Ele pode mandar fora de ordem.
 2. **Confira se vieram todas as páginas** de `paginas[0]` a `paginas[1]`. Página em branco conta, e tem que vir.
    Faltou página → item **devolvido**, dizendo exatamente quais páginas faltam.
 3. **Exercícios feitos?** Se a maioria das questões está em branco → **devolvido**, dizendo quais fazer.
-   Se ele devolveu em branco duas vezes seguidas, crie também um alerta `exercicios_em_branco`.
+   Se `devolucoes_anteriores >= 1` e ele de novo não atendeu o pedido, crie também um alerta `exercicios_em_branco`
+   (para o pai). Na primeira devolução, **não** crie alerta.
+   Ao devolver, preencha `todo`: uma lista curta e exata do que ele tem que mandar, um passo por linha, por exemplo
+   `["Tirar foto da pág. 43 (mesmo em branco)", "Responder Q3 e Q5 da pág. 44 e mandar a foto"]`. Corrija mesmo assim
+   o que estiver visível (os acertos ajudam ele a terminar).
 4. **Corrija** cada exercício visível: `status` certo | errado | parcial | em_branco e um `feedback` curto que mostra
    o caminho (não só a resposta).
 5. **O que está aprendendo:** `topics` (3 a 6) e `summary` (2 ou 3 frases).
@@ -75,16 +90,19 @@ Para cada item com fotos:
 7. `message_to_child`: 1 a 3 frases para o Pantoja.
 8. Grave:
    ```sql
-   select w_save_review($j${"item_id": "...", "verdict": "aceito", "topics": [...], "summary": "...",
+   select w_save_review($j${"item_id": "...", "verdict": "aceito", "todo": [], "topics": [...], "summary": "...",
      "message_to_child": "...", "exercises": [{"ref": "Q3 p.42", "status": "errado", "feedback": "..."}],
      "done_ratio": 0.9, "correct_ratio": 0.7, "revision_sheet": "...",
      "pages": [{"photo_id": "...", "page_number": 42, "sort": 1}]}$j$::jsonb);
    ```
    `done_ratio` = feitos / total visível. `correct_ratio` = certos (parcial vale 0,5) / feitos.
+   A correção anterior vai sozinha para o histórico; grave sempre a correção do conjunto completo.
+   Em `pages`, mande as fotos que valem (a mais nova de cada página), na ordem.
 
 Depois, para o dia como um todo:
 
-- **Buracos de páginas:** compare `paginas` com o `historico` da matéria. Se ele pulou páginas do mesmo capítulo/livro
+- **Buracos de páginas** (só para páginas que **nunca** foram mandadas em nenhum dia; página que faltou num item
+  devolvido já está no `todo` dele, não repita aqui): compare `paginas` com o `historico` da matéria. Se ele pulou páginas do mesmo capítulo/livro
   (por exemplo, mandou 1–4 e agora 26–45, e as 5–25 nunca vieram, sem "sem_aula" que explique), crie um alerta e uma tarefa:
   `w_add_alert {"kind": "paginas_faltando", "subject_id": "...", "title": "Matemática: páginas 5 a 25 não vieram", "details": "..."}`
   `w_add_task {"kind": "fotografar_paginas", "subject_id": "...", "title": "Fotografar págs. 5 a 25 de Matemática", "instructions": "...", "due_on": "<amanhã>"}`
@@ -102,7 +120,7 @@ Depois, para o dia como um todo:
   `w_upsert_chapter {"chapter_id": "...", "status": "finalizado", "summary_sheet": "<resumo do capítulo inteiro, no estilo dele>", "ai_prompt": "<ver seção 5>"}`
   A provinha sai no passo 3, na mesma rodada.
 
-Termine com `select w_finish_checkins();`.
+Termine com `select w_finish_checkins();` (um dia com matéria reenviada durante a rodada volta sozinho para a fila).
 
 ## 3. Provinhas de capítulo (`capitulos_sem_provinha`, ou capítulos que você acabou de fechar)
 

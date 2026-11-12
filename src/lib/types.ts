@@ -30,8 +30,9 @@ export interface CheckinItem {
   id: string; checkin_id: string; subject_id: string; chapter_id: string | null
   learned: string; pages: string; review_status: 'pendente' | 'aceito' | 'devolvido'
   book_id: string | null; page_from: number | null; page_to: number | null; no_class_reason: string | null
+  version: number; returned_at: string | null; resent_at: string | null; created_at: string
 }
-export interface Photo { id: string; item_id: string; storage_path: string; page_number: number | null; sort: number | null }
+export interface Photo { id: string; item_id: string; storage_path: string; page_number: number | null; sort: number | null; version: number }
 export interface ExerciseResult {
   ref: string; status: 'certo' | 'errado' | 'parcial' | 'em_branco'; feedback?: string
 }
@@ -39,7 +40,11 @@ export interface Review {
   id: string; item_id: string; verdict: 'aceito' | 'devolvido'; topics: string[]
   summary: string; message_to_child: string
   exercises: ExerciseResult[]; done_ratio: number | null; correct_ratio: number | null
-  revision_sheet: string; created_at: string
+  revision_sheet: string; created_at: string; version: number; todo: string[]
+}
+export interface ReviewVersion {
+  id: string; item_id: string; version: number; verdict: 'aceito' | 'devolvido'; message_to_child: string
+  todo: string[]; exercises: ExerciseResult[]; done_ratio: number | null; correct_ratio: number | null; reviewed_at: string
 }
 export interface QuizQuestion {
   id: string; type: 'multipla' | 'aberta'; prompt: string; options?: string[]
