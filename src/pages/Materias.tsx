@@ -38,6 +38,10 @@ export default function Materias() {
     await supabase.from('chapters').update({ status: 'finalizado', finished_at: new Date().toISOString() }).eq('id', c.id)
     reload()
   }
+  async function toggleRequired(s: Subject) {
+    await supabase.from('subjects').update({ required: !s.required }).eq('id', s.id)
+    reload()
+  }
   async function toggle(s: Subject) {
     await supabase.from('subjects').update({ active: !s.active }).eq('id', s.id)
     reload()
@@ -50,7 +54,7 @@ export default function Materias() {
       {subjects.map((s) => (
         <div key={s.id} className={'card stack' + (s.active ? '' : ' inactive')}>
           <div className="row between">
-            <strong>{s.name}</strong>
+            <strong>{s.name} {s.required ? <span className="chip">obrigatória</span> : <span className="small muted">opcional</span>}</strong>
             <span className="small muted">{s.last_seen_on ? 'última vez ' + fmtDay(s.last_seen_on) : 'sem registros'}</span>
           </div>
           {chapters.filter((c) => c.subject_id === s.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((c) => (
@@ -79,7 +83,10 @@ export default function Materias() {
             </div>
           )}
           {parent && (
-            <button className="link small" onClick={() => toggle(s)}>{s.active ? 'Arquivar matéria' : 'Reativar matéria'}</button>
+            <div className="row">
+              <button className="link small" onClick={() => toggleRequired(s)}>{s.required ? 'Tornar opcional' : 'Tornar obrigatória'}</button>
+              <button className="link small" onClick={() => toggle(s)}>{s.active ? 'Arquivar matéria' : 'Reativar matéria'}</button>
+            </div>
           )}
         </div>
       ))}

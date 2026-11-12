@@ -2,7 +2,7 @@ export type Role = 'parent' | 'child'
 
 export interface Profile { id: string; family_id: string; role: Role; name: string }
 export interface Family { id: string; name: string; invite_code: string; timezone: string }
-export interface Subject { id: string; name: string; active: boolean; last_seen_on: string | null }
+export interface Subject { id: string; name: string; active: boolean; required: boolean; last_seen_on: string | null }
 export interface Chapter {
   id: string; subject_id: string; title: string
   status: 'em_andamento' | 'finalizado' | 'dominado'; finished_at: string | null

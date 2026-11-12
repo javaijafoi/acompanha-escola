@@ -75,7 +75,8 @@ export default function Hoje() {
   const editable = !checkin || checkin.status === 'rascunho'
   const weekday = new Date(today() + 'T12:00:00Z').getUTCDay()
   const expected = grade[weekday] ?? []
-  const missingSubjects = expected.filter((sid) => !items.some((i) => i.subject_id === sid))
+  const isRequired = (sid: string) => subjects.find((s) => s.id === sid)?.required ?? false
+  const missingSubjects = expected.filter((sid) => isRequired(sid) && !items.some((i) => i.subject_id === sid))
   const pageCount = (i: CheckinItem) => (i.page_from != null && i.page_to != null ? i.page_to - i.page_from + 1 : 1)
   const missingPhotos = items.filter((i) => !i.no_class_reason && photos.filter((p) => p.item_id === i.id).length < pageCount(i))
   const devolvidos = toFix.length
@@ -164,7 +165,7 @@ export default function Hoje() {
           {expected.map((sid) => (
             <button key={sid} className={'chip ' + (items.some((i) => i.subject_id === sid) ? 'done' : '')}
               disabled={!editable || items.some((i) => i.subject_id === sid)} onClick={() => setAdding(sid)}>
-              {items.some((i) => i.subject_id === sid) ? '✓ ' : ''}{subjectName(sid)}
+              {items.some((i) => i.subject_id === sid) ? '✓ ' : ''}{subjectName(sid)}{isRequired(sid) ? '' : ' (opcional)'}
             </button>
           ))}
         </div>

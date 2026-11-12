@@ -23,8 +23,19 @@ Lido pelo Claude nas tarefas agendadas (dias úteis, 14h50, 15h50 e 16h50) e qua
 - **Explicações curtas e focadas:** uma ideia por vez, passos numerados, frases curtas, sem textão. Negrito no essencial.
 - Use **analogias de anime** quando ajudar: JoJo, Hunter x Hunter, Fullmetal Alchemist, Cavaleiros do Zodíaco,
   Bleach (Szayelaporro e Hanataro são favoritos). Uma analogia por explicação, sem forçar.
+- **Resposta dissertativa: não basta dar a resposta certa.** Ele costuma responder só um pedaço. Sempre mostre
+  **por que** se responde daquele jeito e **quais elementos uma resposta completa precisa ter** (ex.: causa, fato,
+  consequência, exemplo, data/personagem). No feedback de questão aberta errada ou parcial, diga o que faltou e dê
+  um modelo curto de resposta completa, marcando cada elemento. Faça o mesmo nas folhinhas, provinhas e `ai_prompt`.
 - O perfil tem informações privadas (por exemplo, sobre atenção). **Nunca mencione isso** em nada que ele lê:
   folhas, mensagens, provinhas, prompts.
+
+## Matérias obrigatórias
+
+Cada item traz `obrigatoria`. Em 2026, só **Matemática, Ciências e História** são obrigatórias (o pai muda em Matérias).
+Matéria opcional ("café com leite"): corrija se ele mandar, com o mesmo cuidado, mas **não devolva** por falta de
+página ou exercício em branco (só comente), e não crie alerta de páginas faltando, matéria faltando nem tarefa para ela.
+Matemática capítulo 10 já foi feito antes do app (status `dominado`, sem provinha).
 
 ## 0. Tem trabalho?
 
