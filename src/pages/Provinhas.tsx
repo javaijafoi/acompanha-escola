@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSession } from '../lib/session'
-import { copyText, loadChapters, loadSubjects } from '../lib/data'
+import { copyText, loadChapters, loadSubjects, uploadToBucket } from '../lib/data'
 import { fmtDay } from '../lib/dates'
 import type { Chapter, Quiz, Subject } from '../lib/types'
 import ProvasEscola from '../components/ProvasEscola'
+import Photos from '../components/Photos'
+import type { Photo } from '../lib/types'
 
 export default function Provinhas() {
   const { profile } = useSession()
@@ -64,17 +66,29 @@ export default function Provinhas() {
 }
 
 function QuizView({ quiz, title, canAnswer, onClose }: { quiz: Quiz; title: string; canAnswer: boolean; onClose: () => void }) {
+  const { profile } = useSession()
   const [answers, setAnswers] = useState<Record<string, string>>(quiz.answers ?? {})
+  const [files, setFiles] = useState<File[]>([])
+  const [sent, setSent] = useState<Photo[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    supabase.from('quiz_photos').select('*').eq('quiz_id', quiz.id).order('sort')
+      .then(({ data }) => setSent(((data ?? []) as any[]).map((p) => ({ ...p, item_id: '', page_number: null, version: 1 }))))
+  }, [quiz.id])
 
   async function submit() {
     const missing = quiz.questions.filter((q) => !answers[q.id]?.trim())
-    if (missing.length && !confirm(`Faltam ${missing.length} questões. Entregar assim mesmo?`)) return
-    setBusy(true)
-    const { error } = await supabase.rpc('submit_quiz', { p_quiz_id: quiz.id, p_answers: answers })
+    if (missing.length && !files.length && !confirm(`Faltam ${missing.length} questões. Entregar assim mesmo?`)) return
+    setBusy(true); setErr(null)
+    try {
+      const paths: string[] = []
+      for (const f of files) paths.push(await uploadToBucket(profile!.family_id, 'provinhas/' + quiz.id, f))
+      const { error } = await supabase.rpc('submit_quiz', { p_quiz_id: quiz.id, p_answers: answers, p_photos: paths })
+      if (error) throw error
+      onClose()
+    } catch (e: any) { setErr(e.message) }
     setBusy(false)
-    if (error) setErr(error.message); else onClose()
   }
 
   return (
@@ -107,8 +121,19 @@ function QuizView({ quiz, title, canAnswer, onClose }: { quiz: Quiz; title: stri
           </div>
         )
       })}
+      {canAnswer && (
+        <div className="card stack">
+          <b>Prefere responder no papel?</b>
+          <p className="small muted">Escreva no caderno (com o número de cada questão), tire foto e mande aqui. Pode misturar: marcar umas no app e mandar outras por foto.</p>
+          <label className="button">📷 Fotos das respostas ({files.length})
+            <input hidden type="file" accept="image/*" capture="environment" multiple onChange={(e) => setFiles([...files, ...Array.from(e.target.files ?? [])])} />
+          </label>
+          {files.length > 0 && <button className="link small" onClick={() => setFiles([])}>Limpar fotos escolhidas</button>}
+        </div>
+      )}
+      {sent.length > 0 && <><p className="small muted">Respostas enviadas por foto:</p><Photos photos={sent} /></>}
       {err && <p className="note danger">{err}</p>}
-      {canAnswer && <button className="primary big" disabled={busy} onClick={submit}>Entregar provinha</button>}
+      {canAnswer && <button className="primary big" disabled={busy} onClick={submit}>{busy ? 'Enviando…' : 'Entregar provinha'}</button>}
     </div>
   )
 }
