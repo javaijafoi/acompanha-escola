@@ -1,0 +1,107 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { useSession } from '../lib/session'
+import { loadChapters, loadSubjects } from '../lib/data'
+import type { Chapter, Quiz, Subject } from '../lib/types'
+
+export default function Provinhas() {
+  const { profile } = useSession()
+  const [quizzes, setQuizzes] = useState<Quiz[]>([])
+  const [chapters, setChapters] = useState<Chapter[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [openId, setOpenId] = useState<string | null>(null)
+
+  async function reload() {
+    const [{ data }, c, s] = await Promise.all([
+      supabase.from('quizzes').select('*').order('created_at', { ascending: false }),
+      loadChapters(), loadSubjects(true),
+    ])
+    setQuizzes((data ?? []) as Quiz[]); setChapters(c); setSubjects(s)
+  }
+  useEffect(() => { reload() }, [])
+
+  const label = (q: Quiz) => {
+    const ch = chapters.find((c) => c.id === q.chapter_id)
+    const sub = subjects.find((s) => s.id === ch?.subject_id)
+    return `${sub?.name ?? ''} · ${ch?.title ?? ''} · tentativa ${q.attempt}`
+  }
+  const child = profile?.role === 'child'
+  const pending = quizzes.filter((q) => q.status === 'disponivel')
+  const done = quizzes.filter((q) => q.status !== 'disponivel')
+
+  const open = quizzes.find((q) => q.id === openId)
+  if (open) return <QuizView quiz={open} title={label(open)} canAnswer={child && open.status === 'disponivel'} onClose={() => { setOpenId(null); reload() }} />
+
+  return (
+    <div className="stack">
+      <h2>Provinhas de revisão</h2>
+      <p className="muted small">Quando um capítulo termina, chega uma provinha. Abaixo de 7, vem outra, até passar.</p>
+      {pending.length === 0 && <p className="banner">Nenhuma provinha pendente agora.</p>}
+      {pending.map((q) => (
+        <button key={q.id} className="card left" onClick={() => setOpenId(q.id)}>
+          <strong>📝 {label(q)}</strong><br /><span className="small muted">{q.questions.length} questões · {child ? 'toque para fazer' : 'aguardando ela fazer'}</span>
+        </button>
+      ))}
+      {done.length > 0 && <h3>Feitas</h3>}
+      {done.map((q) => (
+        <button key={q.id} className="card left" onClick={() => setOpenId(q.id)}>
+          <div className="row between">
+            <span>{label(q)}</span>
+            {q.status === 'corrigida'
+              ? <span className={'score ' + ((q.score ?? 0) >= 7 ? 'ok' : 'bad')}>{q.score?.toFixed(1)}</span>
+              : <span className="small muted">corrigindo…</span>}
+          </div>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function QuizView({ quiz, title, canAnswer, onClose }: { quiz: Quiz; title: string; canAnswer: boolean; onClose: () => void }) {
+  const [answers, setAnswers] = useState<Record<string, string>>(quiz.answers ?? {})
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function submit() {
+    const missing = quiz.questions.filter((q) => !answers[q.id]?.trim())
+    if (missing.length && !confirm(`Faltam ${missing.length} questões. Entregar assim mesmo?`)) return
+    setBusy(true)
+    const { error } = await supabase.rpc('submit_quiz', { p_quiz_id: quiz.id, p_answers: answers })
+    setBusy(false)
+    if (error) setErr(error.message); else onClose()
+  }
+
+  return (
+    <div className="stack">
+      <button className="link" onClick={onClose}>← voltar</button>
+      <h2>{title}</h2>
+      {quiz.status === 'corrigida' && <p className={'banner ' + ((quiz.score ?? 0) >= 7 ? 'ok' : 'warn')}>Nota {quiz.score?.toFixed(1)} {(quiz.score ?? 0) >= 7 ? '— capítulo dominado!' : '— vem outra provinha para treinar.'}</p>}
+      {quiz.questions.map((q, i) => {
+        const fb = quiz.feedback?.[q.id]
+        return (
+          <div key={q.id} className="card stack">
+            <p><b>{i + 1}.</b> {q.prompt}</p>
+            {q.type === 'multipla' ? (
+              <div className="stack tight">
+                {q.options?.map((opt, j) => {
+                  const letter = String.fromCharCode(65 + j)
+                  return (
+                    <label key={j} className="option">
+                      <input type="radio" name={q.id} disabled={!canAnswer} checked={answers[q.id] === letter} onChange={() => setAnswers({ ...answers, [q.id]: letter })} />
+                      <span><b>{letter})</b> {opt}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <textarea rows={4} disabled={!canAnswer} value={answers[q.id] ?? ''} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />
+            )}
+            {fb && <p className={'note ' + (fb.correct ? 'ok' : 'danger')}>{fb.correct ? '✅' : '❌'} {fb.comment}</p>}
+          </div>
+        )
+      })}
+      {err && <p className="note danger">{err}</p>}
+      {canAnswer && <button className="primary big" disabled={busy} onClick={submit}>Entregar provinha</button>}
+    </div>
+  )
+}
