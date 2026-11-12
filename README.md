@@ -7,6 +7,9 @@ correção feita pelo Claude, folhinhas de revisão e provinhas de fim de capít
 - **Backend:** Supabase (`klydltytocppfvofowbf`): Auth, Postgres com RLS, Storage (bucket privado `folhas`).
 - **Correção:** sem servidor próprio e sem chave de API. Tarefas agendadas do Claude (assinatura) rodam
   em dias úteis à tarde e seguem [CORRECAO.md](CORRECAO.md). Também dá pra pedir uma rodada a qualquer hora.
+- **Correção na hora (opcional):** com o PC do responsável ligado, o corretor da pasta [`pc/`](pc/LEIA-ME.md)
+  (Claude Code + Telegram) corrige assim que o aluno entrega. Uma trava no banco (`w_try_open_run`) impede
+  que o PC e as rotinas corrijam a mesma entrega.
 
 ## Fluxo
 1. **Ajustes:** foto da grade horária (se mudar, precisa explicar o porquê), foto do sumário de cada livro e trimestres.
@@ -30,4 +33,4 @@ cp .env.example .env.local
 npm install
 npm run dev
 ```
-Migrações em `supabase/migrations`, edge function em `supabase/functions/fotos-pendentes`.
+Migrações em `supabase/migrations`, edge functions em `supabase/functions` (`fotos-pendentes` para a rodada, `fila` para o vigia do PC).

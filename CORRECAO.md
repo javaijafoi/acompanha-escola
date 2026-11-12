@@ -1,6 +1,8 @@
-# Roteiro da rodada de correção (v3: versões de envio)
+# Roteiro da rodada de correção (v4: trava entre PC e rotinas)
 
-Lido pelo Claude nas tarefas agendadas (dias úteis, 14h50, 15h50 e 16h50) e quando o Peter pede "corrigir agora".
+Lido pelo Claude nas tarefas agendadas (dias úteis, 14h50, 15h50 e 16h50), pelo corretor do PC do Peter
+(pasta `pc/`, corrige na hora em que o Pantoja entrega) e quando o Peter pede "corrigir agora".
+**Só uma rodada pode estar aberta por vez** (passo 0): é isso que impede o PC e a rotina de corrigirem a mesma entrega.
 
 - **Banco:** projeto Supabase `klydltytocppfvofowbf`, via conector Supabase (`execute_sql`).
 - **Grave só por funções `w_*`.** Nunca rode `insert`/`update`/`delete` soltos. Cada função faz uma coisa só.
@@ -43,7 +45,12 @@ Matemática capítulo 10 já foi feito antes do app (status `dominado`, sem prov
 select w_status();
 ```
 Se **todos os números forem 0**, termine aqui sem gravar nada ("Nada para corrigir.").
-Senão: `select w_open_run();` (guarde o id). Se `tarefas_vencidas > 0`: `select w_flag_overdue();`.
+Senão abra a rodada: `select w_try_open_run('rotina');` (o PC usa `'pc'`; pedido manual, `'manual'`). Guarde o id.
+- Se voltar **null**, outra rodada está corrigindo agora (normalmente o PC do Peter). **Termine aqui sem gravar nada**
+  ("O PC já está corrigindo."). O que sobrar fica para a próxima rodada.
+- A trava vale 40 minutos. **Renove** no começo de cada seção (1, 1b, 2, 3, 4): `select w_renew_run('<run_id>');`.
+
+Se `tarefas_vencidas > 0`: `select w_flag_overdue();`.
 Se `devolvidas_sem_reenvio > 0`: `select w_flag_unreturned();` (avisa o pai das matérias devolvidas ontem ou antes
 que o Pantoja não reenviou; a função já monta o alerta com o que faltava).
 
@@ -196,4 +203,4 @@ Gere `ai_prompt` para toda provinha (de capítulo e de bloco) e para todo capít
 ```sql
 select w_close_run('<run_id>', <dias corrigidos>, <provinhas corrigidas>, $t$resumo de 1 linha$t$);
 ```
-Apague as fotos do scratchpad. Termine com um resumo de 2 ou 3 linhas em português.
+Isso libera a trava; não esqueça mesmo se a rodada parar no meio por erro. Apague as fotos do scratchpad. Termine com um resumo de 2 ou 3 linhas em português.
