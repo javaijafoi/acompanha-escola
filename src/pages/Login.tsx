@@ -38,7 +38,7 @@ export default function Login() {
         <label>E-mail<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></label>
         <label>Senha<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === 'entrar' ? 'current-password' : 'new-password'} /></label>
         {mode === 'cadastrar' && (
-          <label>Código da família <span className="muted small">(só a aluna preenche; o responsável deixa em branco)</span>
+          <label>Código da família <span className="muted small">(só o aluno preenche; o responsável deixa em branco)</span>
             <input value={invite} onChange={(e) => setInvite(e.target.value.toUpperCase())} placeholder="ex.: 3FA9C21B" />
           </label>
         )}

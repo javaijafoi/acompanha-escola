@@ -5,7 +5,7 @@ import { pct } from '../lib/dates'
 
 const LABEL: Record<string, string> = { certo: '✅ certo', errado: '❌ errado', parcial: '🟡 parcial', em_branco: '⬜ em branco' }
 
-export default function ReviewCard({ review, forParent = false }: { review: Review; forParent?: boolean }) {
+export default function ReviewCard({ review }: { review: Review }) {
   const [open, setOpen] = useState(false)
   return (
     <div className={'review ' + review.verdict}>
@@ -14,7 +14,6 @@ export default function ReviewCard({ review, forParent = false }: { review: Revi
         <span className="small muted">feitos {pct(review.done_ratio)} · acertos {pct(review.correct_ratio)}</span>
       </div>
       {review.message_to_child && <p>{review.message_to_child}</p>}
-      {forParent && review.note_to_parent && <p className="note">Para você: {review.note_to_parent}</p>}
       {review.topics.length > 0 && (
         <div className="chips">{review.topics.map((t) => <span key={t} className="chip">{t}</span>)}</div>
       )}

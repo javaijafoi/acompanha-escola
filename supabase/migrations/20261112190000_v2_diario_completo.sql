@@ -87,19 +87,18 @@ alter table public.photos
   add column page_number int,  -- definido pela correção ao ler a foto
   add column sort int;         -- ordem certa das páginas
 
--- Observação para o pai sai da tabela que a filha lê
-alter table public.reviews drop column note_to_parent;
+-- Observação para o pai NÃO é mais gravada em reviews (a aluna lê essa tabela);
+-- vai para alerts (kind 'observacao'), que só o responsável vê. Coluna antiga fica vazia.
+comment on column public.reviews.note_to_parent is 'obsoleto: usar alerts';
 
 -- Provinhas também para "blocos de ideia" ------------------------------------
 alter table public.quizzes
-  alter column chapter_id drop not null,
   add column kind text not null default 'capitulo' check (kind in ('capitulo', 'bloco')),
   add column subject_id uuid references public.subjects(id),
   add column title text not null default '',
   add column due_on date,
   add column ai_prompt text not null default '';
-alter table public.quizzes drop constraint quizzes_chapter_id_attempt_key;
-create unique index quizzes_chapter_attempt on public.quizzes(chapter_id, attempt) where kind = 'capitulo';
+-- Toda provinha (inclusive de bloco) pertence a um capítulo; 'attempt' é um contador único por capítulo.
 
 -- Tarefinhas (o que ela vê como pendência) ------------------------------------
 create table public.tasks (
@@ -201,7 +200,6 @@ create policy "responsável edita perfil" on public.learner_profile for update t
   with check (family_id = (select public.my_family_id()));
 
 -- Storage: responsável também pode enviar (livros, grade, calendário)
-drop policy "filha envia fotos das folhas" on storage.objects;
 create policy "família envia fotos" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'folhas' and (storage.foldername(name))[1] = (select public.my_family_id())::text);
@@ -218,7 +216,7 @@ language sql stable security definer set search_path = public as $$
                          or (status = 'corrigindo' and submitted_at < now() - interval '2 hours')),
     'provinhas_respondidas', (select count(*) from quizzes where status = 'respondida'),
     'capitulos_sem_provinha', (select count(*) from chapters c where status = 'finalizado'
-        and not exists (select 1 from quizzes q where q.chapter_id = c.id and q.status in ('disponivel', 'respondida'))),
+        and not exists (select 1 from quizzes q where q.chapter_id = c.id and q.kind = 'capitulo' and q.status in ('disponivel', 'respondida'))),
     'grades_para_ler', (select count(*) from timetables where status = 'aguardando_leitura'),
     'livros_para_ler', (select count(*) from books where status = 'aguardando_leitura'),
     'tarefas_vencidas', (select count(*) from tasks where status = 'pendente' and not late_alerted
@@ -235,7 +233,6 @@ create or replace function public.w_close_run(p_run uuid, p_checkins int, p_quiz
 language sql security definer set search_path = public as $$
   update correction_runs set finished_at = now(), checkins_processed = p_checkins,
          quizzes_graded = p_quizzes, notes = p_notes where id = p_run;
-  delete from worker_tokens where expires_at < now();
 $$;
 
 create or replace function public.w_new_token() returns text
@@ -353,13 +350,13 @@ language sql security definer set search_path = public as $$
   update tasks set status = p_status, done_at = now() where id = p_task and p_status in ('feita', 'cancelada')
 $$;
 
--- {kind: capitulo|bloco, chapter_id?, subject_id?, title, due_on?, ai_prompt, questions[], answer_key{}}
+-- {kind: capitulo|bloco, chapter_id (obrigatório), subject_id?, title, due_on?, ai_prompt, questions[], answer_key{}}
 create or replace function public.w_create_quiz(p jsonb) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid; v_attempt int;
 begin
   select coalesce(max(attempt), 0) + 1 into v_attempt from quizzes
-   where (p->>'chapter_id') is not null and chapter_id = (p->>'chapter_id')::uuid and kind = coalesce(p->>'kind', 'capitulo');
+   where chapter_id = (p->>'chapter_id')::uuid;
   insert into quizzes (family_id, chapter_id, subject_id, kind, attempt, title, due_on, ai_prompt, questions)
   select f.id, (p->>'chapter_id')::uuid,
          coalesce((p->>'subject_id')::uuid, (select subject_id from chapters where id = (p->>'chapter_id')::uuid)),
@@ -431,8 +428,8 @@ create or replace function public.w_set_timetable(p jsonb) returns void
 language plpgsql security definer set search_path = public as $$
 declare t timetables; s jsonb; v_subject uuid;
 begin
-  select * into t from timetables where id = (p->>'timetable_id')::uuid;
-  delete from timetable_slots where timetable_id = t.id;
+  select * into t from timetables where id = (p->>'timetable_id')::uuid and status = 'aguardando_leitura';
+  if t.id is null then raise exception 'grade não está aguardando leitura'; end if;
   for s in select * from jsonb_array_elements(coalesce(p->'slots', '[]'::jsonb)) loop
     insert into subjects (family_id, name) values (t.family_id, s->>'subject')
       on conflict (family_id, name) do update set active = true returning id into v_subject;

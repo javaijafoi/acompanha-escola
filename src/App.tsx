@@ -7,6 +7,7 @@ import Provinhas from './pages/Provinhas'
 import Historico from './pages/Historico'
 import Painel from './pages/Painel'
 import Materias from './pages/Materias'
+import Configurar from './pages/Configurar'
 
 export default function App() {
   const { session, profile, loading } = useSession()
@@ -19,7 +20,7 @@ export default function App() {
     <div className="app">
       <header className="top">
         <strong>AcompanhaEscola</strong>
-        <span className="muted small">{profile.name} · {child ? 'aluna' : 'responsável'}</span>
+        <span className="muted small">{profile.name} · {child ? 'aluno' : 'responsável'}</span>
         <button className="link" onClick={() => supabase.auth.signOut()}>Sair</button>
       </header>
       <main>
@@ -38,6 +39,7 @@ export default function App() {
             </>
           )}
           <Route path="/materias" element={<Materias />} />
+          <Route path="/configurar" element={<Configurar />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
@@ -46,6 +48,7 @@ export default function App() {
         <NavLink to="/provinhas">Provinhas</NavLink>
         <NavLink to="/historico">Histórico</NavLink>
         <NavLink to="/materias">Matérias</NavLink>
+        <NavLink to="/configurar">Ajustes</NavLink>
       </nav>
     </div>
   )
