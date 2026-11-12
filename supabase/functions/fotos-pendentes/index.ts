@@ -1,6 +1,6 @@
 // Edge function usada só pela rodada de correção do Claude.
 // Recebe ?token=... (gerado com `select w_new_token()`, vale 1h) e devolve URLs assinadas (10 min)
-// das fotos que a rodada precisa olhar: folhas das matérias pendentes dos dias em correção (com a versão do envio), sumários de livros, grades novas e provas da escola.
+// das fotos que a rodada precisa olhar: folhas das matérias pendentes dos dias em correção (com a versão do envio), sumários de livros, grades novas, provas da escola e provinhas respondidas no papel.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4'
 
 Deno.serve(async (req) => {
@@ -12,15 +12,16 @@ Deno.serve(async (req) => {
     .eq('token', token).gt('expires_at', new Date().toISOString()).maybeSingle()
   if (!tok) return new Response('unauthorized', { status: 401 })
 
-  const [folhas, livros, grades, provas] = await Promise.all([
+  const [folhas, livros, grades, provas, provinhas] = await Promise.all([
     admin.from('photos')
       .select('id, item_id, storage_path, version, checkin_items!inner(checkin_id, review_status, checkins!inner(status))')
       .eq('checkin_items.checkins.status', 'corrigindo').eq('checkin_items.review_status', 'pendente'),
     admin.from('book_photos').select('id, book_id, storage_path, books!inner(status)').eq('books.status', 'aguardando_leitura'),
     admin.from('timetable_photos').select('id, timetable_id, storage_path, timetables!inner(status)').eq('timetables.status', 'aguardando_leitura'),
     admin.from('exam_photos').select('id, exam_id, storage_path, exams!inner(status)').eq('exams.status', 'aguardando_leitura'),
+    admin.from('quiz_photos').select('id, quiz_id, storage_path, sort, quizzes!inner(status)').eq('quizzes.status', 'respondida'),
   ])
-  const err = folhas.error ?? livros.error ?? grades.error ?? provas.error
+  const err = folhas.error ?? livros.error ?? grades.error ?? provas.error ?? provinhas.error
   if (err) return new Response(err.message, { status: 500 })
 
   const all = [
@@ -28,6 +29,7 @@ Deno.serve(async (req) => {
     ...(livros.data ?? []).map((r) => ({ tipo: 'livro', photo_id: r.id, book_id: r.book_id, storage_path: r.storage_path })),
     ...(grades.data ?? []).map((r) => ({ tipo: 'grade', photo_id: r.id, timetable_id: r.timetable_id, storage_path: r.storage_path })),
     ...(provas.data ?? []).map((r) => ({ tipo: 'prova', photo_id: r.id, exam_id: r.exam_id, storage_path: r.storage_path })),
+    ...(provinhas.data ?? []).map((r) => ({ tipo: 'provinha', photo_id: r.id, quiz_id: r.quiz_id, sort: r.sort, storage_path: r.storage_path })),
   ]
   const paths = all.map((r) => r.storage_path)
   const { data: signed } = paths.length

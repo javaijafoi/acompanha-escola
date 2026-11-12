@@ -172,7 +172,9 @@ E uma tarefa `revisao_capitulo` com o `quiz_id` retornado e o mesmo prazo.
 
 ## 4. Corrigir provinhas respondidas (`provinhas_respondidas`)
 
-`select w_quizzes_to_grade();`. Múltipla escolha: certo ou errado. Aberta: 0, 0,5 ou 1 conforme o critério.
+`select w_quizzes_to_grade();`. Se `fotos > 0`, ele respondeu (todo ou em parte) no papel: as fotos vêm da edge function
+com `tipo: "provinha"` e `quiz_id`. Leia cada foto e junte com `answers` (a resposta da foto vale para a questão que
+não foi respondida no app). Múltipla escolha: certo ou errado. Aberta: 0, 0,5 ou 1 conforme o critério.
 `score` = pontos / questões × 10, com uma casa decimal. `feedback` = `{qid: {correct, comment}}`, com comentário curto
 explicando o erro.
 `select w_grade_quiz($j${"quiz_id": "...", "score": 6.5, "feedback": {...}}$j$::jsonb);` devolve `dominado`, `ok` ou `refazer`.
