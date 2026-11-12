@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__supabase__execute_sql",
+      "mcp__plugin_telegram_telegram__reply",
+      "mcp__plugin_telegram_telegram__react",
+      "mcp__plugin_telegram_telegram__edit_message",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File vigia.ps1)",
+      "Bash(curl:*)",
+      "Bash(mkdir -p fotos)",
+      "Bash(rm -rf fotos)",
+      "Bash(ls:*)",
+      "Bash(date:*)",
+      "Read(./**)",
+      "Read(../CORRECAO.md)",
+      "Edit(./.env)",
+      "Write(./.env)",
+      "Write(./fotos/**)"
+    ],
+    "deny": [
+      "Edit(../src/**)",
+      "Edit(../supabase/**)",
+      "Bash(git push:*)"
+    ]
+  }
+}
